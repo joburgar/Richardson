@@ -66,6 +66,8 @@ dim(X2) # scaled traploc matrix in 1 km units
 500/1736 # density of 0.29 caribou/km2
 200/1736 # density of 0.12 caribou/km2
 
+M <- 200
+
 ###--- format camop to operability matrix for use in models
 oper <- camop
 oper[is.na(oper)] <- 0
@@ -73,19 +75,18 @@ oper <- oper[,4:68]
 dim(oper) # 30 traps by 65 days
 
 ###--- trap operability calculations to determine the number of active traps and days out of potential
-sum(oper) #4231 possible camera days over entire time; 1844 during suvery period
-sum(rowSums(oper!= 0))
-Roper <- rowSums(oper)
-Roper[order(Roper)]
-sum(Roper!= 0) # 30 sites operational between 16-151 days; 15-65 for survey period
-Coper <- colSums(oper)
-Coper[order(Coper)] # 10 - 30 sites active each day; between 26-30 for survey period
+#sum(oper) #4231 possible camera days over entire time; 1844 during suvery period
+#sum(rowSums(oper!= 0))
+#Roper <- rowSums(oper)
+#Roper[order(Roper)]
+#sum(Roper!= 0) # 30 sites operational between 16-151 days; 15-65 for survey period
+#Coper <- colSums(oper)
+#Coper[order(Coper)] # 10 - 30 sites active each day; between 26-30 for survey period
 
 
 #############################################################
 ###--- RUNNING 3 CHAINS IN PARALLEL USING JAGS IMPLEMENTATION
-
-dat <- list(n=n, X=X2, M=200, J=nrow(n), K=ncol(n), xlim=xlims.scaled, ylim=ylims.scaled, area=areakm2.scaled, oper=oper)
+dat <- list(n=n, X=X2, M=M, J=nrow(n), K=ncol(n), xlim=xlims.scaled, ylim=ylims.scaled, area=areakm2.scaled, oper=oper)
 
 # specify initial values
 init <-  function() {  list(sigma=rnorm(1,10), lam0=runif(1) , z=rep(1,dat$M)) }
@@ -134,10 +135,10 @@ library(parallel)
 
 (start.time <- Sys.time())
 cl3 <- makeCluster(3)
-clusterExport(cl3, c("dat2","init2","pars"))
+clusterExport(cl3, c("dat","init","pars"))
 CA.JAGS <- clusterEvalQ(cl3, {
   library(rjags)
-  jm2 <- jags.model("CA.txt", data=dat2, inits=init2, n.chains=1, n.adapt=1000)
+  jm2 <- jags.model("CA.txt", data=dat, inits=init, n.chains=1, n.adapt=1000)
   jc2 <- coda.samples(jm2, pars, n.iter=80000)
   return(as.mcmc(jc2))
 })
