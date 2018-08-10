@@ -1,49 +1,99 @@
 #############################################################
-# HPAR_JAGS_view.output.R
+# 9.RICH_JAGS_view.output.R
 # created by Joanna Burgar, 17-Mar-2016
+# modified by Joanna Burgar, 10-Aug-2018
 # script for viewing JAGS output from folder of output files
+# includes extracting posterior mode
 #############################################################
 
 # set directory
 getwd()
-setwd("/Users/JBurgar/Google Drive/Parks Canada - Caribou Contract March 2018/HPAR (1)/Cedar_Output/") # set working directory
+setwd("C:/Users/JBurgar/Google Drive/Richardson Wildfire Project/3. Data/3.4 Data Analysis/3.4.3 Output") # set working directory
 
 ######################################
 #setwd and load packages
+
 library(coda)
-library(xtable)
+library(coda)
 library(plyr)
 library(dplyr)
 library(stringr)
 library(tidyr)
 library(readr)
 library(ggplot2)
-library(Cairo)
+library(SimDesign) # to estimate bias
 
 
 ######################################
 #load files
+#multiple uploads
 info <- list.files(getwd(),"mc.*RData")
 for(i in 1:length(info)) load(info[[i]]) 
 
 info.mc <- unique(gsub('ET.','',info))
 info.mc <- str_sub(info.mc, 1, str_length(info.mc)-6)
 
-#[1] "mc.CA2013F" "mc.CA2014F" "mc.CA2014S" "mc.CA2015F" "mc.CA2015S"
+#single uploads
+load("mc.CA2_M200.RData")
+load("mc.CA2_M200.ET.RData")
+
+mc.CA2_M200.ET # Time difference of 6.405939 hours
+plot(mc.CA2_M200)
+
 
 ######################################
 #create function to load files and write output to table
 
 #function to create output table for JAGS output
+######################################
+#create function to load files and write output to table
+# function to find estimate mode
+estimate_mode <- function(s) {
+  d <- density(s)
+  d$x[which.max(d$y)]
+}
+
+
+#function to load and create output table for JAGS output
+out <- mc.CA2_M200
+plot(window(out[,c("D","lam0","psi","sigma")], start = 50001))
+
 get_JAGS_output <- function(filename){
-  out <- filename
-  s <- summary(window(out, start = 51001))
-  gd <- gelman.diag(window(out, start = 51001),multivariate = FALSE)
+  out <- window(filename, start = 50001)
+  s <- summary(out[,c("D","N","lam0","psi","sigma")])
+  gd <- gelman.diag(out[,c("D","N","lam0","psi","sigma")],multivariate = FALSE)
+  
+  D <- "["(out,,"D", drop=TRUE)
+  D.unlist <- unlist(D)
+  D.mode <- estimate_mode(D.unlist)
+  
+  N <- "["(out,,"N", drop=TRUE)
+  N.unlist <- unlist(N)
+  N.mode <- estimate_mode(N.unlist)
+  
+  L <- "["(out,,"lam0", drop=TRUE)
+  L.unlist <- unlist(L)
+  L.mode <- estimate_mode(L.unlist)
+  
+  P <- "["(out,,"psi", drop=TRUE)
+  P.unlist <- unlist(P)
+  P.mode <- estimate_mode(P.unlist)
+  
+  S <- "["(out,,"sigma", drop=TRUE)
+  S.unlist <- unlist(S)
+  S.mode <- estimate_mode(S.unlist)
+  
+  mode <- as.data.frame(t(c(D.mode,N.mode,L.mode,P.mode,S.mode)))
+  colnames(mode) <- c("D","N","lam0","psi","sigma")
+  
   output_table <- rbind(as.data.frame(t(s$statistics)),
                         as.data.frame(t(s$quantiles)),
-                        as.data.frame(t(gd$psrf)))
+                        as.data.frame(t(gd$psrf)),
+                        mode)
+  output_table$estimate <- c("Mean", "SD", "Naive SE","Time-series SE", "CI_2.5","CI_25", "CI_50", "CI_75", "CI_97.5", "gd.point","gd.upper","Mode")
   return(output_table)	
 }
+
 
 #function to return model run time (hours)
 get_JAGS_ET <- function(filename){
@@ -51,15 +101,15 @@ get_JAGS_ET <- function(filename){
   return(ET)
 }
 
+
+#plot(out[,c("D","N","lam0","psi","sigma")])
+
 ######################################
-
-
 ###--- create data.frame for JAGS MRT (same order as loaded)
 # load files
 info.ET <- list.files(getwd(),"mc.*ET.RData")
 info.ET <- str_sub(info.ET, 1, str_length(info.ET)-6)
 
-#[1] "mc.CA2013F.ET" "mc.CA2014F.ET" "mc.CA2014S.ET" "mc.CA2015F.ET" "mc.CA2015S.ET"
 
 info.ET_MRT <- vector('list', length(info.ET))
 names(info.ET_MRT) <- paste0('MRT_hrs', seq_along(info.ET))
@@ -89,30 +139,22 @@ JAGS.output.df <- as.data.frame(JAGS.output)
 summary(JAGS.output.df)
 
 
-JAGS.model <- rep(info.mc, times=1, each=11)
+JAGS.model <- rep(info.mc, times=1, each=12)
 JAGS.output.df$model <- JAGS.model
 head(JAGS.output.df,20)
 
-estimates <- c("Mean", "SD", "Naive SE","Time-series SE", "CI_2.5","CI_25", "CI_50", "CI_75", "CI_97.5", "gd.point","gd.upper")
-JAGS.output.df$estimates <- as.factor(rep(estimates, nrow(JAGS.output.df)/11))
-
-
-write.csv(JAGS.output.df, file="HPAR_JAGS_modeloutput.csv")
+write.csv(JAGS.output.df, file="RICH_SC_modeloutput.csv")
 
 
 ###--- manipulate data to be in correct format for ggplot graphs
-data <- read.csv("HPAR_JAGS_modeloutput.csv") 
+data <- read.csv("RICH_SC_modeloutput.csv") 
 
 glimpse(data)
 data <- data[c(-1)]
 head(data)
-
-data$Season <- as.factor(substr(data$model,10,10))
-data$Year <- as.factor(substr(data$model,6,9))
-glimpse(data)
 names(data)
 
-data2 <- gather(data, key=parameter, value=value, 1:4)
+data2 <- gather(data, key=parameter, value=value, 1:5)
 glimpse(data2)
 data2$parameter <- as.factor(data2$parameter)
 str(data2)
@@ -152,18 +194,18 @@ data3$CV <- data3$SD/data3$Mean
 summary(data3$CV)
 summary(data3$gd.point) # Gelman-Rubin diagnostic <1.1 suggests model convergence
 summary(data3$gd.upper) # Gelman-Rubin diagnostic <1.1 suggests model convergence
-write.csv(data3, file="HPAR_JAGS_modeloutput.csv")
+write.csv(data3, file="RICH_SC_modeloutput.csv")
 
 ##########################################################################
 ##########################################################################
 # Plot the Mean and standard deviation for each model by species:  
 
-data3 <- read.csv("HPAR_JAGS_modeloutput.csv")
+data3 <- read.csv("RICH_SC_modeloutput.csv")
 head(data3)
 data3$Season <- as.factor(data3$Season)
 glimpse(data3)
-data3$Season <- mapvalues(data3$Season, from = c( "S","F"),to = c("Summer","Fall"))
-relevel(data3$Season, ref="Summer")
+#data3$Season <- mapvalues(data3$Season, from = c( "S","F"),to = c("Summer","Fall"))
+#relevel(data3$Season, ref="Summer")
 
 p = ggplot(data3, aes(model, CI_50))+
   geom_point(colour="white", shape=21, size=10, 
@@ -192,7 +234,7 @@ p2 = ggplot(data3[grep("Density|Lam0", data3$parameter),], aes(model, CI_50))+
   theme(axis.text.x = element_text(size=14))+
   facet_wrap(~parameter, scales="free_y")
 
-Cairo(file="HPAR_D&Lam0_output.PNG", 
+Cairo(file="RICH_D&Lam0_output.PNG", 
       type="png",
       width=3000, 
       height=2000, 
