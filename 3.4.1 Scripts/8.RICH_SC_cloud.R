@@ -147,6 +147,7 @@ mc.CA2_M200 <- mcmc.list(CA.JAGS)
 (end.time <- Sys.time())
 mc.CA2_M200.ET <- difftime(end.time, start.time, units='hours')
 
+setwd("C:/Users/JBurgar/Google Drive/Richardson Wildfire Project/3. Data/3.4 Data Analysis/3.4.3 Output") # set ouptput directory
 save("mc.CA2_M200",file="mc.CA2_M200.RData")
 save("mc.CA2_M200.ET",file="mc.CA2_M200.ET.RData")
 stopCluster(cl3)
