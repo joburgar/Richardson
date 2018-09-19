@@ -4,8 +4,7 @@
 # script for visualizing telemetry of collared caribou
 #############################################################
 
-###--- Code to take telemetry data from csv text file (i.e., downloaded from ArcGIS and animate
-###— Current issues with map can likely be resolved by extracting from ArcGIS with UTM coordinates rather than lat/long
+###--- Code to take telemetry data from csv text file (i.e., downloaded from ArcGIS and animate)
 
 ###--- Load packages
 library(plyr) #  might not be necessary
